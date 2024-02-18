@@ -5,6 +5,7 @@ import (
 	"math"
 	"reflect"
 	"sync"
+	"time"
 
 	"runtime"
 )
@@ -29,6 +30,8 @@ type ParallelEngine struct {
 	secondaryQueueChan chan EventQueue
 
 	simulationEndHandlers []SimulationEndHandler
+
+	startRealtime time.Time
 }
 
 // NewParallelEngine creates a ParallelEngine
@@ -124,6 +127,7 @@ func (e *ParallelEngine) Schedule(evt Event) {
 
 // Run processes all the events scheduled in the SerialEngine
 func (e *ParallelEngine) Run() error {
+	e.startRealtime = time.Now()
 	for {
 		if !e.hasMoreEvents() {
 			return nil
@@ -270,6 +274,7 @@ func (e *ParallelEngine) tempWorkerRun(evt Event) {
 	_ = handler.Handle(evt)
 
 	hookCtx.Pos = HookPosAfterEvent
+	hookCtx.Detail = time.Since(e.startRealtime)
 	e.InvokeHook(hookCtx)
 
 	e.waitGroup.Done()
