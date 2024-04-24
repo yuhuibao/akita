@@ -22,9 +22,8 @@ const (
 // The storage implementation manages the storage in units. The unit can is
 // similar to the concept of page in memory management. For the units that
 // it not touched by Read and Write function, no memory will be allocated.
-//
 type Storage struct {
-	sync.Mutex
+	sync.RWMutex
 	Capacity uint64
 	unitSize uint64
 	data     map[uint64]*storageUnit
@@ -65,22 +64,36 @@ func NewStorageWithUnitSize(capacity uint64, unitSize uint64) *Storage {
 	return storage
 }
 
-// createOrGetStorageUnit retrieves a storage unit if the unit has been created
-// before. Otherwise it initializes a storage unit in the storage object
-func (s *Storage) createOrGetStorageUnit(address uint64) (*storageUnit, error) {
+// getStorageUnit retrieves a storage unit if the unit has been created
+// before. Otherwise it signals an error
+func (s *Storage) getStorageUnit(address uint64) (*storageUnit, error) {
 	if address > s.Capacity {
 		return nil, errors.New("accessing physical address beyond the storage capacity")
 	}
 
 	baseAddr, _ := s.parseAddress(address)
-	s.Lock()
+	s.RLock()
 	unit, ok := s.data[baseAddr]
 	if !ok {
-		unit = newStorageUnit(s.unitSize)
-		s.data[baseAddr] = unit
+		panic("accessing storage unit that is not initialized")
 	}
-	s.Unlock()
+	s.RUnlock()
 	return unit, nil
+}
+
+// CreateStorageUnit can only be called in memory allocator in driver to initialize storage units for allocated memory
+func (s *Storage) CreateStorageUnit(address uint64) error {
+	if address > s.Capacity {
+		return errors.New("accessing physical address beyond the storage capacity")
+	}
+	_, found := s.data[address]
+	if found {
+		panic("this page is already initialized in storage")
+	}
+	unit := newStorageUnit(s.unitSize)
+	s.data[address] = unit
+
+	return nil
 }
 
 func (s *Storage) parseAddress(addr uint64) (baseAddr, inUnitAddr uint64) {
@@ -96,7 +109,7 @@ func (s *Storage) Read(address uint64, len uint64) ([]byte, error) {
 	res := make([]byte, len)
 
 	for currAddr < address+len {
-		unit, err := s.createOrGetStorageUnit(currAddr)
+		unit, err := s.getStorageUnit(currAddr)
 		if err != nil {
 			return nil, err
 		}
@@ -126,7 +139,7 @@ func (s *Storage) Write(address uint64, data []byte) error {
 	dataOffset := uint64(0)
 
 	for dataOffset < uint64(len(data)) {
-		unit, err := s.createOrGetStorageUnit(currAddr)
+		unit, err := s.getStorageUnit(currAddr)
 		if err != nil {
 			return err
 		}
