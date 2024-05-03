@@ -94,7 +94,7 @@ func (pt *pageTableImpl) Update(page Page) {
 }
 
 type processTable struct {
-	sync.Mutex
+	sync.RWMutex
 	entries      *list.List
 	entriesTable map[uint64]*list.Element
 }
@@ -131,8 +131,8 @@ func (t *processTable) update(page Page) {
 }
 
 func (t *processTable) find(vAddr uint64) (Page, bool) {
-	t.Lock()
-	defer t.Unlock()
+	t.RLock()
+	defer t.RUnlock()
 
 	elem, found := t.entriesTable[vAddr]
 	if found {
