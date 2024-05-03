@@ -2,6 +2,7 @@ package vm
 
 import (
 	"container/list"
+	"log"
 	"sync"
 )
 
@@ -28,6 +29,7 @@ type PageTable interface {
 	Remove(pid PID, vAddr uint64)
 	Find(pid PID, Addr uint64) (Page, bool)
 	Update(page Page)
+	Init(pid PID)
 }
 
 // NewPageTable creates a new PageTable.
@@ -40,22 +42,33 @@ func NewPageTable(log2PageSize uint64) PageTable {
 
 // pageTableImpl is the default implementation of a Page Table
 type pageTableImpl struct {
-	sync.Mutex
+	sync.RWMutex
 	log2PageSize uint64
 	tables       map[PID]*processTable
 }
 
+func (pt *pageTableImpl) creatTable(pid PID) {
+	// pt.Lock()
+	// defer pt.Unlock()
+
+	_, found := pt.tables[pid]
+	if found {
+		log.Panicf("a process table has already been initialized for pid %d", pid)
+	}
+	table := &processTable{
+		entries:      list.New(),
+		entriesTable: make(map[uint64]*list.Element),
+	}
+	pt.tables[pid] = table
+}
+
 func (pt *pageTableImpl) getTable(pid PID) *processTable {
-	pt.Lock()
-	defer pt.Unlock()
+	pt.RLock()
+	defer pt.RUnlock()
 
 	table, found := pt.tables[pid]
 	if !found {
-		table = &processTable{
-			entries:      list.New(),
-			entriesTable: make(map[uint64]*list.Element),
-		}
-		pt.tables[pid] = table
+		panic("accessing process table that is not initialized")
 	}
 
 	return table
@@ -63,6 +76,10 @@ func (pt *pageTableImpl) getTable(pid PID) *processTable {
 
 func (pt *pageTableImpl) alignToPage(addr uint64) uint64 {
 	return (addr >> pt.log2PageSize) << pt.log2PageSize
+}
+
+func (pt *pageTableImpl) Init(pid PID) {
+	pt.creatTable(pid)
 }
 
 // Insert put a new page into the PageTable
