@@ -165,6 +165,12 @@ func (b *Builder) Build(name string) *Cache {
 		numSets, b.wayAssociativity, 1<<b.log2BlockSize,
 		cache.NewLRUVictimFinder())
 	c.storage = mem.NewStorage(b.totalByteSize)
+	for addr := uint64(0); addr < b.totalByteSize; addr += 1 << b.log2BlockSize {
+		err := c.storage.CreateStorageUnit(addr)
+		if err != nil {
+			panic(err.Error())
+		}
+	}
 	c.bankLatency = b.bankLatency
 	c.wayAssociativity = b.wayAssociativity
 	c.lowModuleFinder = b.lowModuleFinder

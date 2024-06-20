@@ -177,6 +177,13 @@ func (b *Builder) configureCache(cacheModule *Cache) {
 	mshr := cache.NewMSHR(b.numMSHREntry)
 	storage := mem.NewStorage(b.byteSize)
 
+	for addr := uint64(0); addr < b.byteSize; addr += 1 << b.log2BlockSize {
+		err := storage.CreateStorageUnit(addr)
+		if err != nil {
+			panic(err.Error())
+		}
+	}
+
 	cacheModule.log2BlockSize = b.log2BlockSize
 	cacheModule.numReqPerCycle = b.numReqPerCycle
 	cacheModule.directory = directory
