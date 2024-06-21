@@ -86,6 +86,8 @@ func (s *Storage) CreateStorageUnit(address uint64) error {
 	if address > s.Capacity {
 		return errors.New("accessing physical address beyond the storage capacity")
 	}
+	s.Lock()
+	defer s.Unlock()
 	_, found := s.data[address]
 	if found {
 		panic("this page is already initialized in storage")
